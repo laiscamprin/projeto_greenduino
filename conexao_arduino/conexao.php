@@ -4,7 +4,7 @@ $exibir_tabela = false;
 $mensagem_erro = "";
 
 if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
-     $con = mysqli_connect('localhost', 'root', '1234', 'exemplo_serial');
+     $con = mysqli_connect('localhost', 'root', '1234', 'greenduino_db');
      // tratamento bem simples caso o mysql de erro, assim é mais facil de identificar
         if(!$con){
             $mensagem_erro = "Erro na conexão do Banco. Erro: " . mysqli_connect_error();
@@ -87,11 +87,11 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
 
      if($exibir_tabela) :?>
 
-    //<div class="data-escolhida" id="data-escolhida"><?php echo $data_escolhida; ?> </div>
+ 
 
-     <?php if(!empty($mensagem_erro)) { ?>
+     <?php if(!empty($mensagem_erro)) : ?>
         <div class="mensagem-erro"><?php echo $mensagem_erro ?> </div>
-      <?php } else: ?>
+      <?php else: ?>
 
             <table>
                 <tr>
@@ -131,8 +131,8 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
          foreach($resultado as $exibirInfo): ?>
 
            <tr>
-                <td> <?php echo date('d/m/Y', strtotime($exibirInfo['data'])) ;?> </td>;
-                <td> <?php echo $exibirInfo['hora'] ;?></td>;
+                <td> <?php echo date('d/m/Y', strtotime($exibirInfo['data'])) ;?> </td>
+                <td> <?php echo $exibirInfo['hora'] ;?></td>
                     <?php 
                        switch($tipo_tabela) {
                             case 'tudo':

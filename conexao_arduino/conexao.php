@@ -172,3 +172,4 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
     const labels = <?php echo json_encode($labels); ?>;
     const tipoTabela = '<?php echo $tipo_tabela; ?>';
 </script>
+hhhhh

@@ -2,10 +2,17 @@
 
 $exibir_tabela = false; 
 $mensagem_erro = "";
+$labels_dh = [];
+$valores = [];
+$valores_temperatura = []; 
+$valores_umidade_ar = [];   
+$valores_umidade_solo = [];
+$valores_irrigacao = [];    
+
 
 if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
      $con = mysqli_connect('localhost', 'root', '1234', 'greenduino_db');
-     // tratamento bem simples caso o mysql de erro, assim é mais facil de identificar
+     
         if(!$con){
             $mensagem_erro = "Erro na conexão do Banco. Erro: " . mysqli_connect_error();
         } else {
@@ -40,8 +47,39 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
         } 
 
         $resultado = mysqli_query($con, $select_tabela);
-        //tratamento de erro para o resultado?
+        $resultado_array = mysqli_fetch_all($resultado, MYSQLI_ASSOC);
+        
 
+        foreach($resultado_array as $linha) {
+            // Labels: data + hora formatada (ex: "01/01 10:00")
+            $labels_dh[] = date('d/m/Y H:i', strtotime($linha['data'] . ' ' . $linha['hora']));
+
+            if($tipo_tabela === 'tudo'){
+                $valores_temperatura[] = (float)($linha['temperatura']);  
+                $valores_umidade_ar[] = (float)($linha['umidade_ar']);  
+                $valores_umidade_solo[] = (float)($linha['umidade_solo']);
+                $valores_irrigacao[] = (float)($linha['irrigacao'] ?? 0);
+            } else{
+            
+            // Valores: baseado no tipo (switch necessário para pegar o campo certo)
+            switch($tipo_tabela) {
+
+                case 'temperatura':
+                    $valores[] = (float)$linha['temperatura'];
+                    break;
+                case 'umidade_ar':
+                    $valores[] = (float)$linha['umidade_ar'];
+                    break;
+                case 'umidade_solo':
+                    $valores[] = (float)$linha['umidade_solo'];
+                    break;
+                case 'irrigacao':
+                    $valores[] = (float)$linha['irrigacao']; 
+                    break;
+            }
+        }
+    }
+    
 }
 ?>
 
@@ -52,13 +90,12 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="estilos.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="script.js"></script>
     <title>DashBoard - Estufa</title>
 </head>
 <body>
     <h1>DashBoard</h1>
     <p id="nome-planta"></p>
-    <img src="planta.jpg">
+    <!--<img src="planta.jpg">-->
 
     <form action="conexao.php" method="POST">
         <label for="data_inicial">Selecione a Data inicial</label>
@@ -66,29 +103,27 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
 
         <label for="data_final">Selecione a Data final(opcional)</label>
         <input type="date" name="data_final" id="data-final" >
-        <button type="submit" id="botao-enviar">Pesquisar</button>
-
-        <button type="submit" name="botao-selecao" value="tudo">Todos</button>
+        <button type="submit" name="botao-selecao" value="tudo">Pesquisar</button>
         <button type="submit" name="botao-selecao" value="temperatura">Temperatura</button>
         <button type="submit" name="botao-selecao" value="umidade_ar">Umidade do Ar</button>
         <button type="submit" name="botao-selecao" value="umidade_solo">Umidade do Solo</button>
         <button type="submit" name="botao-selecao" value="irrigacao">Irrigação</button>
     </form>
 
-    <div id="grafico-tabela" class="grafico-tabela">
-        <canvas id="canva-grafico" class="canva-grafico"> </canvas>
-
+    <div id="div-botao-grafico" class="div-botao-grafico">
+        <button id="botao-grafico" value="line"  onclick="tipoGrafico('line');">Linha  </button>
+        <button id="botao-grafico" value="radar" onclick="tipoGrafico('radar');">Radar </button>
+        <button id="botao-grafico" value="barra" onclick="tipoGrafico('bar');">Barra </button>    
     </div>
-</body>
-</html>
+
+    <div id="grafico-tabela" class="grafico-tabela">
+        <canvas id="canva-grafico" class="canva-grafico" width="800" height="400"> </canvas>
+    </div>
+
 
 <?php
-// agr é hora da arte, ou seja, exibir os resultados
 
      if($exibir_tabela) :?>
-
- 
-
      <?php if(!empty($mensagem_erro)) : ?>
         <div class="mensagem-erro"><?php echo $mensagem_erro ?> </div>
       <?php else: ?>
@@ -99,7 +134,7 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
                     <th> Hora</th>
                     <?php 
                     switch($tipo_tabela){
-                        case'tudo':
+                        case 'tudo':
                         echo '<th>Temperatura (°C)</th><th>Umidade do Ar (%)</th><th>Umidade do Solo (%)</th><th>Irrigação</th>'; 
                         break;
 
@@ -128,7 +163,7 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
             
         <?php
 
-         foreach($resultado as $exibirInfo): ?>
+         foreach($resultado_array as $exibirInfo): ?>
 
            <tr>
                 <td> <?php echo date('d/m/Y', strtotime($exibirInfo['data'])) ;?> </td>
@@ -155,7 +190,7 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
                                 break;
 
                             case 'irrigacao':
-                                echo '<td>' .$exibirInfo['irrigacao'] .'% </td>';
+                                echo '<td>' .$exibirInfo['irrigacao'] .' </td>';
                                 break;
 
                         }
@@ -167,9 +202,124 @@ if(isset($_POST['botao-selecao']) && !empty($_POST['data_inicial'])) {
         <?php endif; ?>
     <?php endif; ?>
 
-  <script>
-    // exemplo da conversão do php para json, para receber em js
-    const labels = <?php echo json_encode($labels); ?>;
-    const tipoTabela = '<?php echo $tipo_tabela; ?>';
-</script>
-hhhhh
+
+<?php if($exibir_tabela && !empty($labels_dh)) : ?>
+<script>
+
+    let grafico;
+     const dadosPHP = {
+             labels: <?php echo json_encode($labels_dh);?>,  
+             valores: <?php echo json_encode($valores);?>,
+             tipo: <?php echo json_encode($tipo_tabela);?>,
+             valores_temperatura:<?php echo json_encode($valores_temperatura);?>,
+             valores_umidade_solo:<?php echo json_encode($valores_umidade_solo);?>,
+             valores_umidade_ar:<?php echo json_encode($valores_umidade_ar);?>,
+             valores_irrigacao:<?php echo json_encode($valores_irrigacao);?>
+
+             };
+
+         const canvas = document.getElementById('canva-grafico');
+        
+        
+        function tipoGrafico(tipoG){
+            if(grafico){ grafico.destroy(); } 
+            if(dadosPHP.labels && dadosPHP.labels.length >0){
+            criarGrafico(dadosPHP,tipoG );}
+            else{
+                alert('Nenhum dados encontrado');
+            }
+        }
+
+        function criarGrafico(dadosPHP, tipoG) {
+
+            if(dadosPHP.tipo !== 'tudo'){
+            grafico = new Chart(canvas, {
+                type: tipoG,
+                data: {
+                    labels: dadosPHP.labels,
+                    datasets: [{
+                    label: dadosPHP.tipo,
+                    data: dadosPHP.valores,
+                    borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                    y: {
+                     beginAtZero: true
+                    }
+                    },
+                    maintainAspectRatio: false
+                }
+            });
+        
+            } else{
+                grafico = new Chart(canvas, {
+                type: tipoG,
+                data: {
+                    labels: dadosPHP.labels,
+                    datasets: [
+                    {
+                        label: "Temperatura (°C)",
+                        data: dadosPHP.valores_temperatura,
+                        borderColor:'#ff0000',
+                        borderWidth: 1
+                    },
+                    {
+                        label:"Umidade do Ar (%)",
+                        data:dadosPHP.valores_umidade_ar,
+                        borderColor:'#0000ff',
+                        borderWidth: 1
+                    },
+                    {
+                        label:"Umidade do Solo(%)",
+                        data: dadosPHP.valores_umidade_solo,
+                        borderColor:'#ffa500',
+                        borderWidth: 1
+                    },
+                    {
+                        label:"Irrigação",
+                        data:dadosPHP.valores_irrigacao,
+                        borderColor:'#000000',
+                        borderWidth: 1
+                    }
+                  ]
+                },
+                options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+            });
+
+            }
+
+
+}
+
+           window.addEventListener('load', function() {
+        if (dadosPHP.labels && dadosPHP.labels.length > 0) {
+            criarGrafico(dadosPHP, 'line');
+        }
+    });
+
+    console.log(dadosPHP.valores_temperatura);
+    </script>
+ <?php endif; ?>
+
+</body>
+</html>

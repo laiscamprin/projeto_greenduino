@@ -12,7 +12,7 @@ float ahtValue;                               //to store T/RH result
 
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type
 
-long tempo=0,tempoleitura=300000;
+long tempo=0,tempo1=0,tempoleitura=60000*5,tempoenviapy=60000*25;
 
 int leitura_sensor = 0;
 const int VALOR_MAXIMO = 1023; //Valor com solo seco
@@ -21,8 +21,11 @@ const int VALOR_MINIMO = 0; //Valor com solo umido
 float  tempDeg;
 float hum;
 
-bool erroaht = false,decide = false, debug = false;
+float umidade_minima = 50.0;
+int leitura_sensor_minima = 20;
 
+bool erroaht = false,decide = false, debug = false, entrouirrigacao = false;
+bool irrigou = false;
 void setup() 
 {
   Serial.begin(9600);
@@ -30,7 +33,7 @@ void setup()
   pinMode(ChaveBomba,INPUT_PULLUP);
   pinMode(Bomba,OUTPUT);
   //digitalWrite(Bomba,LOW);
-  //delay(500);
+  //delay(2500);
   digitalWrite(Bomba,HIGH);
 
   Serial.begin(9600);   
@@ -55,18 +58,18 @@ void setup()
   lcd.setCursor(1,0); 
   lcd.print("GreenDuino"); 
   lcd.setCursor(1,1); 
-  lcd.print("V1.1 30/09/2025"); 
+  lcd.print("V1.2 20/10/2025"); 
   delay(2000);
   lcd.clear();
 
 }
 
 void loop() 
-{
-  LeUmidadeSoloNovo();  
+{  
 
   if (!erroaht) LeAHT21();
 
+   LeUmidadeSoloNovo();
 
   if ((millis() - tempo) >= tempoleitura)
   {  
@@ -79,19 +82,24 @@ void loop()
     Irrigando();
   }
 
-  EnviaPython();
+  if (((millis() - tempo1) >= tempoenviapy) || entrouirrigacao )
+  { 
+    tempo1 = millis();
+    EnviaPython();
+  }
 }
 
 void EnviaPython()
 {
   String sumidadesolo  = String(leitura_sensor); 
-  String sumidadear  =  String(hum, 2); 
+  String sumidadear  =  String(hum, 2);    
   String stempar = String(tempDeg,2);
-  String sirrigacao = String(irrigou);
+  String sirrigacao = String(entrouirrigacao ? 1 : 0);    //String(irrigou ? 1 : 0);
   
-  String sirrigacao = String(irrigou ? "true" : "false");
-  String mensagem = sumidadesolo + ";" + sumidadear + ";" + stempar + ";" + sirrigacao ";";
+  String mensagem = sumidadesolo + ";" + sumidadear + ";" + stempar + ";" + sirrigacao + ";";
   Serial.println(mensagem);
+
+  entrouirrigacao = false;
 }
 
 void LeUmidadeSoloNovo()
@@ -105,7 +113,7 @@ void LeUmidadeSoloNovo()
       Serial.println(leitura_sensor);
     } 
     
-    if ((leitura_sensor < 80) && decide)
+    if ((leitura_sensor <= leitura_sensor_minima) && (hum <= umidade_minima ) && decide)
     { 
     
       if (debug) Serial.println("Status: Solo seco");
@@ -186,8 +194,8 @@ void Irrigando()
   long tb = millis();
   long tbf = 5000;
   long tb1 = millis();
-  boolean irrigou = true;
-  boolean muda = false;
+
+  irrigou = true;
 
   digitalWrite(Bomba,LOW);
   lcd.clear();
@@ -196,8 +204,9 @@ void Irrigando()
 
   while ((millis()-tb)<tbf)
   {
-    if (irrigou)
+   if (irrigou)
     {
+      entrouirrigacao = true;
       if (debug) Serial.println("Irrigando...");
       irrigou = false;
     }
